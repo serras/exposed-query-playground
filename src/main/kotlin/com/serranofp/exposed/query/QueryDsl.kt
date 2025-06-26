@@ -86,7 +86,14 @@ class QueryScope{
         }
 
         var currentQuery = when (val s = selector) {
-            is SelectExpression -> currentColumnSet.select(s.expressions)
+            is SelectExpression -> {
+                // prevent https://stackoverflow.com/questions/72463300/query-with-2-joins-and-subquery-using-kotlin-exposed
+                var aliasCounter = 1
+                val aliasedExpressions = s.expressions.map {
+                    if (it is org.jetbrains.exposed.v1.core.Function<*>) it.alias("__alias${aliasCounter++}") else it
+                }
+                currentColumnSet.select(aliasedExpressions)
+            }
             is SelectAll -> currentColumnSet.selectAll()
         }
         for (operation in operations) {
@@ -100,7 +107,7 @@ class QueryScope{
 /**
  * Return the [Query] to be executed to collect the desired information.
  **/
-fun <A> buildQuery(body: QueryScope.() -> QueryScope.Result<A>): Query {
+fun <A> subQuery(body: QueryScope.() -> QueryScope.Result<A>): Query {
     val queryScope = QueryScope()
     body(queryScope)
     return queryScope.build()
